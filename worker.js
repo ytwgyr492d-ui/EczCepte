@@ -38,7 +38,7 @@ export default {
     // Secret Cloudflare Worker ortamından okunuyor.
     const apiKey = env.COLLECTAPI_KEY;
 
-    if (!apiKey) {
+    if (apikey 4NYtIV3bLge8j0j4hgxb2z:22zho9qSgkKfSBmRCuXY4N) {
       return json({
         success: false,
         message: "COLLECTAPI_KEY secret bulunamadı."
