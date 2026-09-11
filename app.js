@@ -426,46 +426,87 @@ function dedupePharmacies(list) {
  *    açıkça gösterilir (bölüm 5, 15, 25 kuralı).
  * ------------------------------------------------------------------------- */
 async function fetchDutyPharmacies(il, ilce) {
-  const apiKey = safeLocalGet("nc_collectapi_key");
   const dateKey = todayIstanbulKey();
   const cacheKey = `nc_duty_${il}_${ilce}_${dateKey}`;
 
-  if (!apiKey) {
-    return { list: [], meta: { status: "unverified", source: null, fetchedAt: nowIso(), reason: "no_api_key" } };
-  }
-
   const cached = safeLocalGet(cacheKey);
-  if (cached && Date.now() - cached.fetchedAtMs < CONFIG.DUTY_CACHE_TTL_MS) {
-    return { list: cached.list, meta: { status: "ok", source: "CollectAPI (önbellek)", fetchedAt: cached.fetchedAt, dateKey } };
+
+  if (
+    cached &&
+    Date.now() - cached.fetchedAtMs < CONFIG.DUTY_CACHE_TTL_MS
+  ) {
+    return {
+      list: cached.list,
+      meta: {
+        status: "ok",
+        source: "Nöbetçi Cepte (önbellek)",
+        fetchedAt: cached.fetchedAt,
+        dateKey
+      }
+    };
   }
 
   try {
-    const url = `https://api.collectapi.com/health/dutyPharmacy?il=${encodeURIComponent(il)}&ilce=${encodeURIComponent(ilce)}`;
-    const res = await fetchWithTimeout(url, 10000, {
-      headers: { authorization: `apikey ${apiKey}`, "content-type": "application/json" }
-    });
-    if (!res.ok) throw new Error(`duty_http_${res.status}`);
-    const json = await res.json();
-    if (!json.success || !Array.isArray(json.result)) throw new Error("duty_bad_payload");
+    const backendUrl =
+      "https://nobetci-cepte-jwt7j9.v2.appdeploy.ai/api/duty-pharmacies" +
+      `?province=${encodeURIComponent(il)}` +
+      `&district=${encodeURIComponent(ilce)}`;
 
-    // Tarih kontrolü: kaynağın bugüne ait olduğunu doğrulayamıyorsak "unverified" göster
+    const res = await fetchWithTimeout(
+      backendUrl,
+      12000
+    );
+
+    if (!res.ok) {
+      throw new Error(`duty_backend_http_${res.status}`);
+    }
+
+    const json = await res.json();
+
+    if (!json.success || !Array.isArray(json.result)) {
+      throw new Error("duty_bad_payload");
+    }
+
     const list = json.result.map((r, idx) => ({
       id: `duty_${idx}_${normalizeText(r.name)}`,
-      name: r.name,
-      address: r.address,
-      phone: r.phone,
-      dist: r.dist,
-      il, ilce
+      name: r.name || "",
+      address: r.address || "",
+      phone: r.phone || "",
+      dist: r.dist || null,
+      il,
+      ilce
     }));
 
-    safeLocalSet(cacheKey, { list, fetchedAt: nowIso(), fetchedAtMs: Date.now() });
-    return { list, meta: { status: "ok", source: "CollectAPI", fetchedAt: nowIso(), dateKey } };
+    safeLocalSet(cacheKey, {
+      list,
+      fetchedAt: nowIso(),
+      fetchedAtMs: Date.now()
+    });
+
+    return {
+      list,
+      meta: {
+        status: "ok",
+        source: "Nöbetçi Cepte Güvenli API",
+        fetchedAt: nowIso(),
+        dateKey
+      }
+    };
+
   } catch (e) {
     console.warn("[duty] alınamadı:", e.message);
-    return { list: [], meta: { status: "error", source: "CollectAPI", fetchedAt: nowIso(), reason: e.message } };
+
+    return {
+      list: [],
+      meta: {
+        status: "error",
+        source: "Nöbetçi Cepte Güvenli API",
+        fetchedAt: nowIso(),
+        reason: e.message
+      }
+    };
   }
 }
-
 function mergeDutyIntoPharmacies(pharmacies, dutyList) {
   if (!dutyList.length) return pharmacies;
   const used = new Set();
