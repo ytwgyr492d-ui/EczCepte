@@ -452,6 +452,63 @@ async function fetchDutyPharmacies(il, ilce) {
       `?province=${encodeURIComponent(il)}` +
       `&district=${encodeURIComponent(ilce)}`;
 
+    const res = await fetchWithTimeout(backendUrl, 12000);
+
+    if (!res.ok) {
+      throw new Error(`duty_backend_http_${res.status}`);
+    }
+
+    const json = await res.json();
+
+    if (!json.success || !Array.isArray(json.result)) {
+      throw new Error("duty_bad_payload");
+    }
+
+    const list = json.result.map((r, idx) => ({
+      id: `duty_${idx}_${normalizeText(r.name)}`,
+      name: r.name || "",
+      address: r.address || "",
+      phone: r.phone || "",
+      dist: r.dist || null,
+      il,
+      ilce
+    }));
+
+    safeLocalSet(cacheKey, {
+      list,
+      fetchedAt: nowIso(),
+      fetchedAtMs: Date.now()
+    });
+
+    return {
+      list,
+      meta: {
+        status: "ok",
+        source: "Nöbetçi Cepte Güvenli API",
+        fetchedAt: nowIso(),
+        dateKey
+      }
+    };
+
+  } catch (e) {
+    console.warn("[duty] alınamadı:", e.message);
+
+    return {
+      list: [],
+      meta: {
+        status: "error",
+        source: "Nöbetçi Cepte Güvenli API",
+        fetchedAt: nowIso(),
+        reason: e.message
+      }
+    };
+  }
+  try {
+    const backendUrl =
+      "https://nobetci-cepte-jwt7j9.v2.appdeploy.ai/api/duty-pharmacies" +
+      `?province=${encodeURIComponent(il)}` +
+      `&district=${encodeURIComponent(ilce)}`;
+
     const res = await fetchWithTimeout(
       backendUrl,
       12000
