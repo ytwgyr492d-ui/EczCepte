@@ -507,6 +507,7 @@ async function fetchDutyPharmacies(il, ilce) {
     };
   }
 }
+
 function mergeDutyIntoPharmacies(pharmacies, dutyList) {
   if (!dutyList.length) return pharmacies;
   const used = new Set();
